@@ -1,0 +1,43 @@
+---
+title: "Trabajo Práctico de Análisis Estadístico"
+subtitle: "Maestría de Ciencia de Datos - UNAJ"
+date: "2025-06-30"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+
+library(tidyverse)
+
+```
+
+## Integrantes:
+
+-   Facundo Cuba
+-   Leticia Nanini
+-   Mauro Cejas Marcovecchio
+-   Yesica Travasso
+
+## Descripción
+
+El objetivo del siguiente trabajo es el procesamiento de datos y análisis estadísticos del dataset provisto por el Sistema de Información y Gestión Agrometeorológica (SIGA), del [Instituto Nacional de Tecnología Agropecuaria (INTA)](https://siga.inta.gob.ar/). Esta base de datos contiene información agrometeorológica de la ciudad de Castelar, Provincia de Buenos Aires, Argentina.
+
+## Parte 1: Estadística descriptiva
+
+## Parte 2: Test de Hipótesis - Regresión Lineal
+
+## Parte 3: Estadística no paramétrica
+
+
+```{r}
+
+archivo <- "datos/01_Buenos_Aires_Castelar.csv"
+df <- read_csv2(archivo)
+
+```
+
