@@ -6,12 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(
-	echo = TRUE,
-	message = FALSE,
-	warning = FALSE
-)
-
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
 library(tidyverse)
 
 ```
@@ -29,15 +24,67 @@ El objetivo del siguiente trabajo es el procesamiento de datos y análisis estad
 
 ## Parte 1: Estadística descriptiva
 
-## Parte 2: Test de Hipótesis - Regresión Lineal
+En primer lugar, vamos a poder tener una primera aproximación a los datos a partir del paquete ReadR, ya que el delimitador utilizado para separar las columnas es ";" y ",." como separador decimal. Así, podremos ver que tendremos 472 observaciones con 5 variables:
 
-## Parte 3: Estadística no paramétrica
+- *Fecha* (en formato fecha)
 
+- *Temperatura_Abrigo_150cm* (en formato número): La temperatura de abrigo es aquella medida en el abrigo meteorológico, que protege los instrumentos de medición de la radiación directa del sol, de la radiación terrestre nocturna, precipitación y condensación, entre otros; y su piso de abrigo, es decir, la altura a la que es medida la temperatura, es de 150 cm por sobre el nivel del suelo.
+
+- *Humedad Media* (en formato número)
+
+- *Presión Media* (en formato número)
+
+- *Radiación Global* (en formato número)
 
 ```{r}
 
+# Cargamos los datos del grupo
+
 archivo <- "datos/01_Buenos_Aires_Castelar.csv"
-df <- read_csv2(archivo)
+
+df <- read_delim(archivo, 
+                 delim = ";", 
+                 locale = locale(decimal_mark = "."))
+
 
 ```
 
+De la misma forma, podremos ver los primeros datos que contiene la base de datos:
+
+```{r}
+
+head(df)
+
+```
+
+También, podremos realizar un resumen simple con las principales estadísticas descriptivas de los datos:
+
+```{r}
+
+summary(df)
+
+```
+
+```{r}
+
+ggplot(df, aes(x = Temperatura_Abrigo_150cm)) +
+         geom_histogram(bins = 10, fill = "steelblue", color = "white") +
+         theme_minimal()
+  
+```
+
+```{r}
+
+ggplot(df, aes(y = Temperatura_Abrigo_150cm)) +
+  geom_boxplot(fill = "lightblue") +
+  theme_minimal() +
+  labs(title = "Boxplots por variable", x = "Variable", y = "Valor") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+
+## Parte 2: Test de Hipótesis - Regresión Lineal
+
+## Parte 3: Estadística no paramétrica
