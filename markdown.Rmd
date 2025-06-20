@@ -7,6 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+
 library(tidyverse)
 
 ```
@@ -24,11 +25,11 @@ El objetivo del siguiente trabajo es el procesamiento de datos y análisis estad
 
 ## Parte 1: Estadística descriptiva
 
-En primer lugar, vamos a poder tener una primera aproximación a los datos a partir del paquete ReadR, ya que el delimitador utilizado para separar las columnas es ";" y ",." como separador decimal. Así, podremos ver que tendremos 472 observaciones con 5 variables:
+En primer lugar, vamos a poder tener una primera aproximación a los datos a partir del paquete ReadR, ya que el delimitador utilizado para separar las columnas es ";" y "." como separador decimal. Así, podremos ver que tendremos 472 observaciones con 5 variables:
 
 - *Fecha* (en formato fecha)
 
-- *Temperatura_Abrigo_150cm* (en formato número): La temperatura de abrigo es aquella medida en el abrigo meteorológico, que protege los instrumentos de medición de la radiación directa del sol, de la radiación terrestre nocturna, precipitación y condensación, entre otros; y su piso de abrigo, es decir, la altura a la que es medida la temperatura, es de 150 cm por sobre el nivel del suelo.
+- *Temperatura_Abrigo_150cm* (en formato número): La temperatura de abrigo es aquella medida en el abrigo meteorológico, que protege los instrumentos de medición de la radiación directa del sol, de la radiación terrestre nocturna, precipitación y condensación, entre otros. Su piso de abrigo es la altura a la que es medida la temperatura. En este caso, es de 150 cm por sobre el nivel del suelo.
 
 - *Humedad Media* (en formato número)
 
@@ -57,29 +58,58 @@ head(df)
 
 ```
 
-También, podremos realizar un resumen simple con las principales estadísticas descriptivas de los datos:
+También, podremos realizar una descripción numérica de los datos a partir de sus principales medidas de estadística descriptiva:
 
 ```{r}
 
 summary(df)
 
+
 ```
+Tales medidas podrán ser visualizadas de mejor manera a partir de gráficos de líneas tradicionales, suavizados, histogramas y box-plots.
 
 ```{r}
 
-ggplot(df, aes(x = Temperatura_Abrigo_150cm)) +
-         geom_histogram(bins = 10, fill = "steelblue", color = "white") +
-         theme_minimal()
+df_long <- df |>
+  pivot_longer(cols = -Fecha, names_to = "Variable", values_to = "Valor")
+
+ggplot(df_long, aes(x = Fecha, y = Valor, color = Variable)) +
+  geom_line(show.legend = FALSE) +
+  facet_wrap(~Variable, scales = "free_y") +
+  theme_minimal() 
+
+```
+
+
+```{r}
+
+ggplot(df_long, aes(x = Fecha, y = Valor, color = Variable)) +
+  geom_smooth(show.legend = FALSE) +
+  facet_wrap(~Variable, scales = "free_y") +
+  theme_minimal() 
+
+```
+
+
+
+
+```{r}
+
+ggplot(df_long, aes(x = Valor, fill = Variable)) +
+  geom_histogram(bins = 10, show.legend = FALSE) +
+  facet_wrap(~Variable, scales = "free_x") +
+  theme_minimal() +
+  labs(y = "Cantidad")
   
 ```
 
 ```{r}
 
-ggplot(df, aes(y = Temperatura_Abrigo_150cm)) +
-  geom_boxplot(fill = "lightblue") +
+ggplot(df_long, aes(y = Valor, fill = Variable)) +
+  geom_boxplot(show.legend = FALSE) +
+  facet_wrap(~Variable, scales = "free_y", nrow = 1) +
   theme_minimal() +
-  labs(title = "Boxplots por variable", x = "Variable", y = "Valor") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  labs(y = "Valor")
 
 ```
 
