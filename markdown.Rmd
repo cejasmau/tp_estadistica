@@ -9,6 +9,8 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
 
 library(tidyverse)
+library(lmtest)
+library(coin)
 
 ```
 
@@ -25,17 +27,7 @@ El objetivo del siguiente trabajo es el procesamiento de datos y análisis estad
 
 ## Parte 1: Estadística descriptiva
 
-En primer lugar, vamos a poder tener una primera aproximación a los datos a partir del paquete ReadR, ya que el delimitador utilizado para separar las columnas es ";" y "." como separador decimal. Así, podremos ver que tendremos 472 observaciones con 5 variables:
-
-- *Fecha* (en formato fecha)
-
-- *Temperatura_Abrigo_150cm* (en formato número): La temperatura de abrigo es aquella medida en el abrigo meteorológico, que protege los instrumentos de medición de la radiación directa del sol, de la radiación terrestre nocturna, precipitación y condensación, entre otros. Su piso de abrigo es la altura a la que es medida la temperatura. En este caso, es de 150 cm por sobre el nivel del suelo.
-
-- *Humedad Media* (en formato número)
-
-- *Presión Media* (en formato número)
-
-- *Radiación Global* (en formato número)
+En primer lugar, vamos a poder tener una primera aproximación a los datos a partir del paquete ReadR, ya que el delimitador utilizado para separar las columnas es ";" y "." como separador decimal.
 
 ```{r}
 
@@ -50,7 +42,18 @@ df <- read_delim(archivo,
 
 ```
 
-De la misma forma, podremos ver los primeros datos que contiene la base de datos:
+Así, podremos ver que tendremos 472 observaciones con 5 variables:
+
+- *Fecha* (en formato fecha)
+
+- *Temperatura_Abrigo_150cm* (en formato número): La temperatura de abrigo es aquella medida en el abrigo meteorológico, que protege los instrumentos de medición de la radiación directa del sol, de la radiación terrestre nocturna, precipitación y condensación, entre otros. Su piso de abrigo es la altura a la que es medida la temperatura. En este caso, es de 150 cm por sobre el nivel del suelo.
+
+- *Humedad Media* (en formato número)
+
+- *Presión Media* (en formato número)
+
+- *Radiación Global* (en formato número)
+
 
 ```{r}
 
@@ -62,8 +65,9 @@ También, podremos realizar una descripción numérica de los datos a partir de 
 
 ```{r}
 
-summary(df)
-
+df |>
+  select(-Fecha) |>
+  summary()
 
 ```
 Tales medidas podrán ser visualizadas de mejor manera a partir de gráficos de líneas tradicionales, suavizados, histogramas y box-plots.
@@ -79,18 +83,6 @@ ggplot(df_long, aes(x = Fecha, y = Valor, color = Variable)) +
   theme_minimal() 
 
 ```
-
-
-```{r}
-
-ggplot(df_long, aes(x = Fecha, y = Valor, color = Variable)) +
-  geom_smooth(show.legend = FALSE) +
-  facet_wrap(~Variable, scales = "free_y") +
-  theme_minimal() 
-
-```
-
-
 
 
 ```{r}
@@ -113,8 +105,257 @@ ggplot(df_long, aes(y = Valor, fill = Variable)) +
 
 ```
 
-
-
 ## Parte 2: Test de Hipótesis - Regresión Lineal
 
+Con el fin de tener una primera imagen acerca de las relaciones entre pares de las variables vamos a realizar una matriz de dispersión. 
+
+```{r}
+
+df |>
+  select(-Fecha) |>
+  pairs(lower.panel = NULL,
+        pch = 1,
+        col = 'dodgerblue2',
+        main = "Matriz de dispersión",
+        las = 1,
+        labels = c("Temperatura", "Humedad", "Presión", "Radiación"),
+        gap = 0.5,
+        rowlattop = FALSE,
+        cex = 0.6,
+        cex.labels = 1.2,
+        cex.axis = 0.8,
+        font.labels = 1)
+
+
+```
+
+Al ver el cruce entre los valores de Temperatura de Abrigo y la Radiación Global, podríamos llegar a inferir una correlación positiva entre ambas. Por tal motivo, vamos a realizar un modelo de regresión lineal simple para comprobarlo.
+
+```{r}
+
+modelo_regresion <- lm(Radiacion_Global ~ Temperatura_Abrigo_150cm, data = df)
+
+summary(modelo_regresion)
+
+```
+```{r}
+
+ggplot(df, aes(x = Temperatura_Abrigo_150cm, y = Radiacion_Global)) +
+  geom_point(alpha = 0.5,
+             color = "dodgerblue2") +
+  geom_smooth(method = "lm", 
+              se = TRUE) + 
+  labs(title = "Regresión Lineal: Radiación Global vs Temperatura del Abrigo",
+       x = "Temperatura del Abrigo (150cm)",
+       y = "Radiación Global") +
+  theme_minimal()
+
+```
+
+```{r}
+
+ # Análisis gráfico de residuos
+par(mfrow = c(2, 2))  # Configurar 4 gráficos en 2x2
+plot(modelo_regresion, which = c(1, 2, 3, 5))  # Gráficos principales
+par(mfrow = c(1, 1))  # Restaurar configuración
+
+# Pruebas estadísticas
+cat("\n--- PRUEBAS ESTADÍSTICAS ---\n")
+
+# Normalidad
+shapiro_test <- shapiro.test(residuals(modelo_regresion))
+cat("\nNormalidad (Shapiro-Wilk):\n")
+cat("p-valor =", format.pval(shapiro_test$p.value),
+    ifelse(shapiro_test$p.value < 0.05,
+           "-> Rechazar normalidad",
+           "-> No rechazar normalidad"), "\n")
+
+# Homocedasticidad
+if(!require(lmtest)) install.packages("lmtest"); library(lmtest)
+bp_test <- bptest(modelo_regresion)
+cat("\nHomocedasticidad (Breusch-Pagan):\n")
+cat("p-valor =", format.pval(bp_test$p.value),
+    ifelse(bp_test$p.value < 0.05,
+           "-> Evidencia de heterocedasticidad",
+           "-> No evidencia de heterocedasticidad"), "\n")
+
+# Autocorrelación (opcional para series temporales)
+if("orden_temporal" %in% names(df)) {
+  dw_test <- dwtest(modelo_regresion)
+  cat("\nAutocorrelación (Durbin-Watson):\n")
+  cat("Estadístico DW =", round(dw_test$statistic, 3),
+      ifelse(dw_test$p.value < 0.05,
+             "-> Evidencia de autocorrelación",
+             "-> No evidencia de autocorrelación"), "\n")
+}
+
+
+```
+
+```{r}
+
+# Coeficiente de determinación (R-cuadrado)
+cat("\nCoeficiente de Determinación (R-cuadrado):\n")
+print(summary(modelo_regresion)$r.squared)
+
+```
+
+
+```{r}
+
+# Test de hipótesis simplificado para la pendiente de regresión
+alfa <- 0.05
+resumen <- summary(modelo_regresion)
+coef_info <- resumen$coefficients["Temperatura_Abrigo_150cm", ]
+
+# Extraer estadísticos
+t_value <- coef_info["t value"]
+p_value <- coef_info["Pr(>|t|)"]
+df2 <- nrow(modelo_regresion$model) - 2
+
+# Mostrar resultados
+cat("--- Test de Hipótesis sobre la Pendiente ---\n",
+    "H0: beta1 = 0 (No hay relación lineal)\n",
+    "Ha: beta1 ≠ 0 (Existe relación lineal)\n\n",
+    "Estadísticos:\n",
+    "Coeficiente estimado:", round(coef_info["Estimate"], 4), "\n",
+    "Error estándar:", round(coef_info["Std. Error"], 4), "\n",
+    "Estadístico t:", round(t_value, 4), "\n",
+    "Grados libertad:", df2, "\n",
+    "p-valor:", format.pval(p_value, digits = 4), "\n\n",
+    "Decisión:\n", sep = "")
+
+if(p_value < alfa) {
+  cat("Rechazamos H0 (p = ", format.pval(p_value), " < α = ", alfa, ")\n",
+      "Conclusión: Existe relación lineal significativa (p = ",
+      format.pval(p_value), ")\n", sep = "")
+} else {
+  cat("No rechazamos H0 (p = ", format.pval(p_value), " ≥ α = ", alfa, ")\n",
+      "Conclusión: No hay evidencia suficiente de relación lineal (p =",
+      format.pval(p_value), ")\n", sep = "")
+}
+
+```
+
+```{r}
+
+# REGRESIÓN LINEAL MÚLTIPLE
+
+# Selección de variables
+vars_numericas <- names(df)[sapply(df, is.numeric)]
+vars_independientes <- setdiff(vars_numericas, "Radiacion_Global") # Excluir la dependiente
+
+# Fórmula del modelo (todas las variables numéricas)
+formula_multiple <- as.formula(paste("Radiacion_Global ~", paste(vars_independientes, collapse = " + ")))
+cat("Fórmula del modelo:\n")
+print(formula_multiple)
+
+# Ajustar el modelo
+modelo_multiple <- lm(formula_multiple, data = df)
+
+# Resumen del modelo
+cat("\n--- RESUMEN DEL MODELO ---\n")
+summary_modelo <- summary(modelo_multiple)
+print(summary_modelo)
+
+# Métricas clave
+cat("\n--- MÉTRICAS DE AJUSTE ---\n")
+cat("R² ajustado:", round(summary_modelo$adj.r.squared, 4), "\n")
+cat("Error estándar residual:", round(summary_modelo$sigma, 4), "\n")
+
+# Análisis de coeficientes
+cat("\n--- SIGNIFICANCIA DE PREDICTORES ---\n")
+coef_tabla <- summary_modelo$coefficients
+print(round(coef_tabla, 4))
+
+# Gráficos diagnósticos
+cat("\nPreparando gráficos diagnósticos...\n")
+par(mfrow = c(2, 2))
+plot(modelo_multiple, which = c(1, 2, 5))
+par(mfrow = c(1, 1))
+
+# Pruebas de supuestos
+cat("\n--- PRUEBAS DE SUPUESTOS ---\n")
+cat("Normalidad (Shapiro-Wilk): p =",
+    format.pval(shapiro.test(residuals(modelo_multiple))$p.value), "\n")
+
+if(!require(lmtest)) install.packages("lmtest"); library(lmtest)
+cat("Homocedasticidad (Breusch-Pagan): p =",
+    format.pval(bptest(modelo_multiple)$p.value), "\n")
+
+# Recomendación final
+cat("\n--- RECOMENDACIONES ---\n")
+if(any(coef_tabla[-1, 4] < 0.05)) {
+  cat("- Predictores significativos detectados (p < 0.05)\n")
+} else {
+  cat("- Ningún predictor mostró significancia estadística\n")
+}
+
+if(summary_modelo$adj.r.squared < 0.5) {
+  cat("- El modelo explica poca variabilidad (R² ajustado < 50%)\n")
+} else {
+  cat("- Buen poder explicativo del modelo (R² ajustado ≥ 50%)\n")
+}
+
+```
+
 ## Parte 3: Estadística no paramétrica
+
+```{r}
+
+# Test Paramétrico Original (Regresión Lineal)
+cat("\n=== MÉTODO PARAMÉTRICO (REGRESIÓN LINEAL) ===\n")
+summary_param <- summary(modelo_regresion)
+coef_param <- summary_param$coefficients["Temperatura_Abrigo_150cm", ]
+p_param <- coef_param["Pr(>|t|)"]
+
+cat("Coeficiente:", round(coef_param["Estimate"], 4),
+    "\nValor-p:", format.pval(p_param, digits = 4), "\n")
+
+# Test No Paramétrico (Correlación de Spearman)
+cat("\n=== MÉTODO NO PARAMÉTRICO (SPEARMAN) ===\n")
+cor_test <- cor.test(~ Radiacion_Global + Temperatura_Abrigo_150cm,
+                     data = df,
+                     method = "spearman",
+                     exact = FALSE)  # Para n > 50
+
+cat("Coeficiente Rho:", round(cor_test$estimate, 4),
+    "\nValor-p:", format.pval(cor_test$p.value, digits = 4), "\n")
+
+# Gráfico Comparativo
+ggplot(df, aes(x = Temperatura_Abrigo_150cm, y = Radiacion_Global)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", color = "red", se = FALSE, linetype = "dashed") +
+  geom_smooth(method = "loess", color = "blue", se = FALSE) +
+  labs(title = "Comparación de Modelos",
+       subtitle = "Rojo: Lineal (paramétrico) | Azul: LOESS (no paramétrico)",
+       x = "Temperatura Abrigo (150cm)",
+       y = "Radiación Global") +
+  theme_minimal()
+
+# Conclusión Comparativa
+cat("\n=== CONCLUSIÓN COMPARATIVA ===\n")
+if(p_param < 0.05 & cor_test$p.value < 0.05) {
+  cat("Ambos métodos coinciden en que existe relación significativa (p < 0.05).\n")
+  cat("El modelo paramétrico estima una pendiente de", round(coef_param["Estimate"], 4),
+      "mientras que Spearman muestra una correlación de", round(cor_test$estimate, 4), "\n")
+} else if(p_param >= 0.05 & cor_test$p.value >= 0.05) {
+  cat("Ambos métodos coinciden en NO encontrar relación significativa (p > 0.05).\n")
+} else {
+  cat("Los métodos discrepan:\n")
+  if(p_param < 0.05) {
+    cat("- El método paramétrico encuentra relación significativa (p =", format.pval(p_param), ")\n")
+  } else {
+    cat("- El método paramétrico NO encuentra relación significativa (p =", format.pval(p_param), ")\n")
+  }
+  if(cor_test$p.value < 0.05) {
+    cat("- El método no paramétrico encuentra relación significativa (p =", format.pval(cor_test$p.value), ")\n")
+  } else {
+    cat("- El método no paramétrico NO encuentra relación significativa (p =", format.pval(cor_test$p.value), ")\n")
+  }
+  cat("\nPosible causa: Supuestos del modelo paramétrico no se cumplen (ver residuos).\n")
+}
+
+```
+
+
