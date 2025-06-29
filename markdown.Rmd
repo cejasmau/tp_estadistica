@@ -1,8 +1,15 @@
 ---
-title: "Trabajo Práctico de Análisis Estadístico"
+title: "Trabajo Final de Análisis Estadístico"
 subtitle: "Maestría de Ciencia de Datos - UNAJ"
-date: "2025-06-30"
-output: html_document
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    theme: cerulean
+    toc: yes
+    toc_depth: 2
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
 ---
 
 ```{r setup, include=FALSE}
@@ -11,21 +18,22 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
 library(tidyverse)
 library(lmtest)
 library(coin)
+library(gt)
 
 ```
 
-## Integrantes:
+## Descripción
+
+El objetivo del siguiente trabajo es el procesamiento de datos y análisis estadísticos del dataset provisto por el Sistema de Información y Gestión Agrometeorológica (SIGA), del [Instituto Nacional de Tecnología Agropecuaria (INTA)](https://siga.inta.gob.ar/). Esta base de datos contiene información agrometeorológica de la ciudad de Castelar, Provincia de Buenos Aires, Argentina.
+
+### Integrantes
 
 -   Facundo Cuba
 -   Leticia Nanini
 -   Mauro Cejas Marcovecchio
 -   Yesica Travasso
 
-## Descripción
-
-El objetivo del siguiente trabajo es el procesamiento de datos y análisis estadísticos del dataset provisto por el Sistema de Información y Gestión Agrometeorológica (SIGA), del [Instituto Nacional de Tecnología Agropecuaria (INTA)](https://siga.inta.gob.ar/). Esta base de datos contiene información agrometeorológica de la ciudad de Castelar, Provincia de Buenos Aires, Argentina.
-
-## Parte 1: Estadística descriptiva
+## 1. Estadística descriptiva
 
 En primer lugar, vamos a poder tener una primera aproximación a los datos a partir del paquete ReadR, ya que el delimitador utilizado para separar las columnas es ";" y "." como separador decimal.
 
@@ -44,15 +52,15 @@ df <- read_delim(archivo,
 
 Así, podremos ver que tendremos 472 observaciones con 5 variables:
 
-- *Fecha* (en formato fecha)
+- **Fecha**(en formato fecha): Día de medición.
 
-- *Temperatura_Abrigo_150cm* (en formato número): La temperatura de abrigo es aquella medida en el abrigo meteorológico, que protege los instrumentos de medición de la radiación directa del sol, de la radiación terrestre nocturna, precipitación y condensación, entre otros. Su piso de abrigo es la altura a la que es medida la temperatura. En este caso, es de 150 cm por sobre el nivel del suelo.
+- **Temperatura_Abrigo_150cm** (en formato número): La temperatura de abrigo es aquella medida en el abrigo meteorológico, que protege los instrumentos de medición de la radiación directa del sol, de la radiación terrestre nocturna, precipitación y condensación, entre otros. Su piso de abrigo es la altura a la que es medida la temperatura. En este caso, es de 150 cm por sobre el nivel del suelo.
 
-- *Humedad Media* (en formato número)
+- **Humedad Media** (en formato número): La humedad relativa es la relación entre la presión parcial del vapor de agua y la presión de vapor de equilibrio del agua a una temperatura dada.
 
-- *Presión Media* (en formato número)
+- **Presión Media** (en formato número): La presión atmosférica es la fuerza por unidad de superficie que ejerce el aire que forma la atmósfera sobre la superficie terrestre.
 
-- *Radiación Global* (en formato número)
+- **Radiación Global** (en formato número): La radiación global es la radiación solar que recibe la superficie terrestre
 
 
 ```{r}
@@ -65,9 +73,45 @@ También, podremos realizar una descripción numérica de los datos a partir de 
 
 ```{r}
 
-df |>
+estadisticas <- df |>
   select(-Fecha) |>
-  summary()
+  summarise(across(everything(), 
+                  list(Minimo = min,
+                       Q1 = ~quantile(., 0.25),
+                       Mediana = median,
+                       Media = mean, 
+                       Q3 = ~quantile(., 0.75),
+                       Maximo = max,
+                       Desvio = sd,
+                       IQR = IQR),
+                  .names = "{.col}-{.fn}")) |>
+  pivot_longer(everything(), 
+               names_to = c("Variable", "Estadistica"), 
+               names_sep = "-") |>
+  pivot_wider(names_from = "Variable", values_from = "value")
+
+estadisticas |>
+  gt(rowname_col = "Estadistica",
+     groupname_col = "")|>
+  
+  tab_stubhead(label = "Medidas") |>
+  fmt_number(decimals = 2) |>
+  
+  cols_label(
+    "Temperatura_Abrigo_150cm" = "Temperatura de Abrigo",
+    "Humedad_Media" = "Humedad media",
+    "Presion_Media" = "Presion media",
+    "Radiacion_Global" = "Radiación global"
+  ) |>
+  
+  tab_style(
+    style = cell_text(color = "black", 
+                        weight = "bold"),
+   locations = list(
+        cells_stub(),
+        cells_stubhead(),
+        cells_column_labels(everything())))
+
 
 ```
 Tales medidas podrán ser visualizadas de mejor manera a partir de gráficos de líneas tradicionales, suavizados, histogramas y box-plots.
@@ -105,7 +149,7 @@ ggplot(df_long, aes(y = Valor, fill = Variable)) +
 
 ```
 
-## Parte 2: Test de Hipótesis - Regresión Lineal
+## 2. Test de Hipótesis - Regresión Lineal
 
 Con el fin de tener una primera imagen acerca de las relaciones entre pares de las variables vamos a realizar una matriz de dispersión. 
 
@@ -129,7 +173,7 @@ df |>
 
 ```
 
-Al ver el cruce entre los valores de Temperatura de Abrigo y la Radiación Global, podríamos llegar a inferir una correlación positiva entre ambas. Por tal motivo, vamos a realizar un modelo de regresión lineal simple para comprobarlo.
+Al ver el cruce entre los valores de Temperatura de Abrigo y la Radiación Global, podríamos inferir una correlación positiva entre ambas. Por tal motivo, vamos a realizar un modelo de regresión lineal simple para comprobarlo.
 
 ```{r}
 
@@ -299,7 +343,7 @@ if(summary_modelo$adj.r.squared < 0.5) {
 
 ```
 
-## Parte 3: Estadística no paramétrica
+## 3. Estadística no paramétrica
 
 ```{r}
 
