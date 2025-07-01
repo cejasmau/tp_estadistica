@@ -98,10 +98,10 @@ estadisticas |>
   fmt_number(decimals = 2) |>
   
   cols_label(
-    "Temperatura_Abrigo_150cm" = "Temperatura de Abrigo",
-    "Humedad_Media" = "Humedad media",
-    "Presion_Media" = "Presion media",
-    "Radiacion_Global" = "Radiación global"
+    "Temperatura_Abrigo_150cm" = "Temperatura",
+    "Humedad_Media" = "Humedad",
+    "Presion_Media" = "Presion",
+    "Radiacion_Global" = "Radiación"
   ) |>
   
   tab_style(
@@ -170,37 +170,50 @@ df |>
         cex.axis = 0.8,
         font.labels = 1)
 
-
 ```
 
-Al ver el cruce entre los valores de Temperatura de Abrigo y la Radiación Global, podríamos inferir una correlación positiva entre ambas. Por tal motivo, vamos a realizar un modelo de regresión lineal simple para comprobarlo.
+Al ver el diagrama de dispersión entre los valores de temperatura de abrigo y la radiación global, podríamos inferir una correlación positiva entre ambas. Por tal motivo, vamos a realizar un modelo de regresión lineal simple para comprobarlo, en el que la Temperatura de Abrigo dependa del nivel de Radiación Global.
 
 ```{r}
 
-modelo_regresion <- lm(Radiacion_Global ~ Temperatura_Abrigo_150cm, data = df)
+modelo_regresion <- lm(Temperatura_Abrigo_150cm ~ Radiacion_Global, data = df)
 
 summary(modelo_regresion)
 
 ```
+A partir del resumen, podremos ver que los coeficientes del modelo serán una ordenada al origen de 11.81 y una pendiente de 0.41. Asimismo, graficaremos la regresión junto al cálculo de sus intervalos de confianza con un nivel del 95% (siendo notable la cantidad de observaciones que se encuentren por fuera de sus valores):
+
+
 ```{r}
 
-ggplot(df, aes(x = Temperatura_Abrigo_150cm, y = Radiacion_Global)) +
+print("Intervalos de confianza para los coeficientes:")
+
+confint(modelo_regresion, level = .95)
+
+```
+
+```{r}
+
+ggplot(df, aes(x = Radiacion_Global, y = Temperatura_Abrigo_150cm)) +
   geom_point(alpha = 0.5,
              color = "dodgerblue2") +
   geom_smooth(method = "lm", 
               se = TRUE) + 
-  labs(title = "Regresión Lineal: Radiación Global vs Temperatura del Abrigo",
-       x = "Temperatura del Abrigo (150cm)",
-       y = "Radiación Global") +
+  labs(x = "radiación global",
+       y = "Temperatura del Abrigo (150cm)") +
   theme_minimal()
 
 ```
+
+En relación a la validez del modelo, verificamos que el p-valor de la pendiente es muy pequeño, lo que puede significar que exista una relación lineal entre ambas variables o que con un polinomio de mayor orden se obtenga un mejor resultado. Si bien el p-valor de la ordenada al origen también es chico, el bajo valor del coeficiente de correlación nos hace dudar acerca de la representatividad del modelo. Por ello, vamos a testear los supuestos de independencia y distribución de los que partimos para obtener estos valores:
 
 ```{r}
 
  # Análisis gráfico de residuos
 par(mfrow = c(2, 2))  # Configurar 4 gráficos en 2x2
-plot(modelo_regresion, which = c(1, 2, 3, 5))  # Gráficos principales
+plot(modelo_regresion, 
+     which = c(1, 2, 3, 5),
+     col = "dodgerblue2")  # Gráficos principales
 par(mfrow = c(1, 1))  # Restaurar configuración
 
 # Pruebas estadísticas
@@ -250,7 +263,7 @@ print(summary(modelo_regresion)$r.squared)
 # Test de hipótesis simplificado para la pendiente de regresión
 alfa <- 0.05
 resumen <- summary(modelo_regresion)
-coef_info <- resumen$coefficients["Temperatura_Abrigo_150cm", ]
+coef_info <- resumen$coefficients["Radiacion_Global", ]
 
 # Extraer estadísticos
 t_value <- coef_info["t value"]
@@ -350,7 +363,7 @@ if(summary_modelo$adj.r.squared < 0.5) {
 # Test Paramétrico Original (Regresión Lineal)
 cat("\n=== MÉTODO PARAMÉTRICO (REGRESIÓN LINEAL) ===\n")
 summary_param <- summary(modelo_regresion)
-coef_param <- summary_param$coefficients["Temperatura_Abrigo_150cm", ]
+coef_param <- summary_param$coefficients["Radiacion_Global", ]
 p_param <- coef_param["Pr(>|t|)"]
 
 cat("Coeficiente:", round(coef_param["Estimate"], 4),
