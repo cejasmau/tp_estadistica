@@ -123,8 +123,15 @@ df_long <- df |>
 
 ggplot(df_long, aes(x = Fecha, y = Valor, color = Variable)) +
   geom_line(show.legend = FALSE) +
-  facet_wrap(~Variable, scales = "free_y") +
-  theme_minimal() 
+  facet_wrap(~Variable, 
+             scales = "free_y",
+             labeller = labeller(
+               Variable = c(
+                 "Humedad_Media" = "Humedad media",
+                 "Presion_Media" = "Presion media",
+                 "Radiacion_Global" = "Radiación global",
+                 "Temperatura_Abrigo_150cm" = "Temperatura de abrigo"))) +
+  theme_minimal()
 
 ```
 
@@ -133,7 +140,14 @@ ggplot(df_long, aes(x = Fecha, y = Valor, color = Variable)) +
 
 ggplot(df_long, aes(x = Valor, fill = Variable)) +
   geom_histogram(bins = 10, show.legend = FALSE) +
-  facet_wrap(~Variable, scales = "free_x") +
+  facet_wrap(~Variable, 
+             scales = "free_x",
+             labeller = labeller(
+               Variable = c(
+                 "Humedad_Media" = "Humedad media",
+                 "Presion_Media" = "Presion media",
+                 "Radiacion_Global" = "Radiación global",
+                 "Temperatura_Abrigo_150cm" = "Temperatura de abrigo"))) +
   theme_minimal() +
   labs(y = "Cantidad")
   
@@ -143,7 +157,15 @@ ggplot(df_long, aes(x = Valor, fill = Variable)) +
 
 ggplot(df_long, aes(y = Valor, fill = Variable)) +
   geom_boxplot(show.legend = FALSE) +
-  facet_wrap(~Variable, scales = "free_y", nrow = 1) +
+  facet_wrap(~Variable, 
+             scales = "free_y", 
+             nrow = 1,
+             labeller = labeller(
+               Variable = c(
+                 "Humedad_Media" = "Humedad media",
+                 "Presion_Media" = "Presion media",
+                 "Radiacion_Global" = "Radiación global",
+                 "Temperatura_Abrigo_150cm" = "Temperatura"))) +
   theme_minimal() +
   labs(y = "Valor")
 
