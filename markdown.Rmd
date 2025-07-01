@@ -222,7 +222,7 @@ ggplot(df, aes(x = Radiacion_Global, y = Temperatura_Abrigo_150cm)) +
   geom_smooth(method = "lm", 
               se = TRUE) + 
   labs(x = "radiación global",
-       y = "Temperatura del Abrigo (150cm)") +
+       y = "Temperatura del Abrigo") +
   theme_minimal()
 
 ```
@@ -231,13 +231,58 @@ En relación a la validez del modelo, verificamos que el p-valor de la pendiente
 
 ```{r}
 
- # Análisis gráfico de residuos
-par(mfrow = c(2, 2))  # Configurar 4 gráficos en 2x2
-plot(modelo_regresion, 
-     which = c(1, 2, 3, 5),
-     col = "dodgerblue2")  # Gráficos principales
-par(mfrow = c(1, 1))  # Restaurar configuración
+# Residuos estandarizados vs Valores ajustados
 
+plot(fitted(modelo_regresion),
+     rstandard(modelo_regresion),
+     col = "dodgerblue2",
+     xlab = "Valores ajustados",
+     ylab = "Residuos estandarizados")
+abline(h=2, lty=2, lwd=1, col="black")
+abline(h=-2, lty=2, lwd=1, col="black")
+abline(h=0, col="black")
+
+```
+
+En este gráfico, vamos a observar la relación entre los valores ajustados y el residuo estandarizado. Podemos ver, así, que existen algunos valores atípicos que se ubican por fuera del rango (-2,2).
+
+```{r}
+
+# Residuos vs Valores ajustados
+
+plot(fitted(modelo_regresion),
+     resid(modelo_regresion),
+     col = "dodgerblue2",
+     xlab = "Valores ajustados",
+     ylab = "Residuos")
+abline(h = 0, lty = 2, col = "black") 
+lines(lowess(fitted(modelo_regresion), 
+             resid(modelo_regresion)), 
+      col = "red")  
+
+```
+
+En relación al comportamiento de la varianza σ², veremos que la curva roja (útil para verificar la media cero) es relativamente plana y cercana a cero.
+
+```{r}
+
+# Gráfico Q-Q de normalidad
+
+qqnorm(
+  rstandard(modelo_regresion),
+  col = "dodgerblue2",
+  main = "",
+  xlab = "Cuantiles teóricos (Distrib. Normal)",  
+  ylab = "Residuos estandarizados"       
+)
+qqline(rstandard(modelo_regresion), col = "black", lty = 2)  
+
+```
+
+Finalmente, la curva de QQ-Plot nos permite observar que la condición de normalidad ajusta bien, tomando apenas una forma de S en las puntas.
+
+
+```{r}
 # Pruebas estadísticas
 cat("\n--- PRUEBAS ESTADÍSTICAS ---\n")
 
@@ -259,7 +304,7 @@ cat("p-valor =", format.pval(bp_test$p.value),
            "-> No evidencia de heterocedasticidad"), "\n")
 
 # Autocorrelación (opcional para series temporales)
-if("orden_temporal" %in% names(df)) {
+if("Fecha" %in% names(df)) {
   dw_test <- dwtest(modelo_regresion)
   cat("\nAutocorrelación (Durbin-Watson):\n")
   cat("Estadístico DW =", round(dw_test$statistic, 3),
