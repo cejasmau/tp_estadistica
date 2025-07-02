@@ -52,16 +52,15 @@ df <- read_delim(archivo,
 
 Así, podremos ver que tendremos 472 observaciones con 5 variables:
 
-- **Fecha**(en formato fecha): Día de medición.
+-   **Fecha**(en formato fecha): Día de medición.
 
-- **Temperatura_Abrigo_150cm** (en formato número): La temperatura de abrigo es aquella medida en el abrigo meteorológico, que protege los instrumentos de medición de la radiación directa del sol, de la radiación terrestre nocturna, precipitación y condensación, entre otros. Su piso de abrigo es la altura a la que es medida la temperatura. En este caso, es de 150 cm por sobre el nivel del suelo.
+-   **Temperatura_Abrigo_150cm** (en formato número): La temperatura de abrigo es aquella medida en el abrigo meteorológico, que protege los instrumentos de medición de la radiación directa del sol, de la radiación terrestre nocturna, precipitación y condensación, entre otros. Su piso de abrigo es la altura a la que es medida la temperatura. En este caso, es de 150 cm por sobre el nivel del suelo.
 
-- **Humedad Media** (en formato número): La humedad relativa es la relación entre la presión parcial del vapor de agua y la presión de vapor de equilibrio del agua a una temperatura dada.
+-   **Humedad Media** (en formato número): La humedad relativa es la relación entre la presión parcial del vapor de agua y la presión de vapor de equilibrio del agua a una temperatura dada.
 
-- **Presión Media** (en formato número): La presión atmosférica es la fuerza por unidad de superficie que ejerce el aire que forma la atmósfera sobre la superficie terrestre.
+-   **Presión Media** (en formato número): La presión atmosférica es la fuerza por unidad de superficie que ejerce el aire que forma la atmósfera sobre la superficie terrestre.
 
-- **Radiación Global** (en formato número): La radiación global es la radiación solar que recibe la superficie terrestre
-
+-   **Radiación Global** (en formato número): La radiación global es la radiación solar que recibe la superficie terrestre
 
 ```{r}
 
@@ -114,6 +113,7 @@ estadisticas |>
 
 
 ```
+
 Tales medidas podrán ser visualizadas de mejor manera a partir de gráficos de líneas tradicionales, suavizados, histogramas y box-plots.
 
 ```{r}
@@ -134,7 +134,6 @@ ggplot(df_long, aes(x = Fecha, y = Valor, color = Variable)) +
   theme_minimal()
 
 ```
-
 
 ```{r}
 
@@ -173,7 +172,7 @@ ggplot(df_long, aes(y = Valor, fill = Variable)) +
 
 ## 2. Test de Hipótesis - Regresión Lineal
 
-Con el fin de tener una primera imagen acerca de las relaciones entre pares de las variables vamos a realizar una matriz de dispersión. 
+Con el fin de tener una primera imagen acerca de las relaciones entre pares de las variables vamos a realizar una matriz de dispersión.
 
 ```{r}
 
@@ -203,8 +202,8 @@ modelo_regresion <- lm(Temperatura_Abrigo_150cm ~ Radiacion_Global, data = df)
 summary(modelo_regresion)
 
 ```
-A partir del resumen, podremos ver que los coeficientes del modelo serán una ordenada al origen de 11.81 y una pendiente de 0.41. Asimismo, graficaremos la regresión junto al cálculo de sus intervalos de confianza con un nivel del 95% (siendo notable la cantidad de observaciones que se encuentren por fuera de sus valores):
 
+A partir del resumen, podremos ver que los coeficientes del modelo serán una ordenada al origen de 11.81 y una pendiente de 0.41. Asimismo, graficaremos la regresión junto al cálculo de sus intervalos de confianza con un nivel del 95% (siendo notable la cantidad de observaciones que se encuentren por fuera de sus valores):
 
 ```{r}
 
@@ -227,7 +226,7 @@ ggplot(df, aes(x = Radiacion_Global, y = Temperatura_Abrigo_150cm)) +
 
 ```
 
-En relación a la validez del modelo, verificamos que el p-valor de la pendiente es muy pequeño, lo que puede significar que exista una relación lineal entre ambas variables o que con un polinomio de mayor orden se obtenga un mejor resultado. Si bien el p-valor de la ordenada al origen también es chico, el bajo valor del coeficiente de correlación nos hace dudar acerca de la representatividad del modelo. Por ello, vamos a testear los supuestos de independencia y distribución de los que partimos para obtener estos valores:
+Antes de empezar con el modelo, vamos a testear los supuestos de independencia y distribución de los que partimos para obtener sus correspondientes valores:
 
 ```{r}
 
@@ -279,87 +278,45 @@ qqline(rstandard(modelo_regresion), col = "black", lty = 2)
 
 ```
 
-Finalmente, la curva de QQ-Plot nos permite observar que la condición de normalidad ajusta bien, tomando apenas una forma de S en las puntas.
-
+Finalmente, la curva de QQ-Plot nos permite observar que, con la información y evidencia disponible, la condición de normalidad ajusta bien, tomando apenas una forma de S en las puntas.
 
 ```{r}
-# Pruebas estadísticas
-cat("\n--- PRUEBAS ESTADÍSTICAS ---\n")
-
-# Normalidad
-shapiro_test <- shapiro.test(residuals(modelo_regresion))
-cat("\nNormalidad (Shapiro-Wilk):\n")
-cat("p-valor =", format.pval(shapiro_test$p.value),
-    ifelse(shapiro_test$p.value < 0.05,
-           "-> Rechazar normalidad",
-           "-> No rechazar normalidad"), "\n")
-
-# Homocedasticidad
-if(!require(lmtest)) install.packages("lmtest"); library(lmtest)
-bp_test <- bptest(modelo_regresion)
-cat("\nHomocedasticidad (Breusch-Pagan):\n")
-cat("p-valor =", format.pval(bp_test$p.value),
-    ifelse(bp_test$p.value < 0.05,
-           "-> Evidencia de heterocedasticidad",
-           "-> No evidencia de heterocedasticidad"), "\n")
-
-# Autocorrelación (opcional para series temporales)
-if("Fecha" %in% names(df)) {
-  dw_test <- dwtest(modelo_regresion)
-  cat("\nAutocorrelación (Durbin-Watson):\n")
-  cat("Estadístico DW =", round(dw_test$statistic, 3),
-      ifelse(dw_test$p.value < 0.05,
-             "-> Evidencia de autocorrelación",
-             "-> No evidencia de autocorrelación"), "\n")
-}
-
-
+summary(modelo_regresion)
 ```
+
+De esta manera, no habiendo evidencia suficiente para rechazar las condiciones para el ruido aditivo E ∼ N(0, σ²), podemos considerar ambas variables X e Y como aleatorias y definir su coeficiente de correlación. Tal como vimos en el resumen del modelo:
 
 ```{r}
 
 # Coeficiente de determinación (R-cuadrado)
-cat("\nCoeficiente de Determinación (R-cuadrado):\n")
-print(summary(modelo_regresion)$r.squared)
+print("Coeficiente de correlación (R²):")
+print(summary(modelo_regresion)$r.squared, digits = 4)
 
 ```
 
+Este coeficiente expresa cuánto de la variabilidad de los datos es explicada por el modelo de regresión lineal y su bajo valor nos hace dudar acerca de la representatividad del modelo que desarrollamos.
+
+Aún así, verificamos que el p-valor de la pendiente ß₁ y de la ordenada al origen ß₀ son muy pequeños, lo que puede significar que exista una relación lineal entre ambas variables o que con un polinomio de mayor orden se obtenga un mejor resultado. Entonces, bajo la condición de normalidad, podremos realizar un test de hipótesis sobre la pendiente:
+
+-   *H₀: ß₁ = 0*
+
+-   *H₁: ß₁ ≠ 0*
 
 ```{r}
 
-# Test de hipótesis simplificado para la pendiente de regresión
-alfa <- 0.05
-resumen <- summary(modelo_regresion)
 coef_info <- resumen$coefficients["Radiacion_Global", ]
 
-# Extraer estadísticos
-t_value <- coef_info["t value"]
-p_value <- coef_info["Pr(>|t|)"]
-df2 <- nrow(modelo_regresion$model) - 2
-
-# Mostrar resultados
-cat("--- Test de Hipótesis sobre la Pendiente ---\n",
-    "H0: beta1 = 0 (No hay relación lineal)\n",
-    "Ha: beta1 ≠ 0 (Existe relación lineal)\n\n",
-    "Estadísticos:\n",
-    "Coeficiente estimado:", round(coef_info["Estimate"], 4), "\n",
-    "Error estándar:", round(coef_info["Std. Error"], 4), "\n",
-    "Estadístico t:", round(t_value, 4), "\n",
+cat("Estadísticos:\n",
+    "Coeficiente estimado:", round(coef_info["Estimate"], 2), "\n",
+    "Error estándar:", round(coef_info["Std. Error"], 2), "\n",
+    "Estadístico t:", round(t_value, 2), "\n",
     "Grados libertad:", df2, "\n",
-    "p-valor:", format.pval(p_value, digits = 4), "\n\n",
-    "Decisión:\n", sep = "")
-
-if(p_value < alfa) {
-  cat("Rechazamos H0 (p = ", format.pval(p_value), " < α = ", alfa, ")\n",
-      "Conclusión: Existe relación lineal significativa (p = ",
-      format.pval(p_value), ")\n", sep = "")
-} else {
-  cat("No rechazamos H0 (p = ", format.pval(p_value), " ≥ α = ", alfa, ")\n",
-      "Conclusión: No hay evidencia suficiente de relación lineal (p =",
-      format.pval(p_value), ")\n", sep = "")
-}
+    "p-valor:", format.pval(p_value), "\n\n")
 
 ```
+
+Como el p-valor es menor a un nivel de significatividad α del 5%, podemos comprobar que no existe evidencia suficiente para descartar la relación lineal entre las variables.
+
 
 ```{r}
 
@@ -481,5 +438,3 @@ if(p_param < 0.05 & cor_test$p.value < 0.05) {
 }
 
 ```
-
-
