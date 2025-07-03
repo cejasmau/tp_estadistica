@@ -13,8 +13,11 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
-
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
 library(tidyverse)
 library(lmtest)
 library(coin)
@@ -304,81 +307,31 @@ Aún así, verificamos que el p-valor de la pendiente ß₁ y de la ordenada al 
 
 ```{r}
 
+resumen <- summary(modelo_regresion)
 coef_info <- resumen$coefficients["Radiacion_Global", ]
 
 cat("Estadísticos:\n",
     "Coeficiente estimado:", round(coef_info["Estimate"], 2), "\n",
     "Error estándar:", round(coef_info["Std. Error"], 2), "\n",
-    "Estadístico t:", round(t_value, 2), "\n",
-    "Grados libertad:", df2, "\n",
-    "p-valor:", format.pval(p_value), "\n\n")
+    "Estadístico t:", round(coef_info["t value"], 2), "\n",
+    "Grados libertad:", nrow(modelo_regresion$model) - 2, "\n",
+    "p-valor:", format.pval(coef_info["Pr(>|t|)"]), "\n\n")
 
 ```
 
 Como el p-valor es menor a un nivel de significatividad α del 5%, podemos comprobar que no existe evidencia suficiente para descartar la relación lineal entre las variables.
 
+Así, tal como fue planteado anteriormente, vamos a realizar una regresión lineal múltiple incorporando el resto de las variables con las que contamos. En este caso, a diferencia de la regresión previa, tomaremos la Radiación Global como variable dependiente.
 
 ```{r}
 
-# REGRESIÓN LINEAL MÚLTIPLE
+modelo_regmult <- lm(Radiacion_Global ~ Temperatura_Abrigo_150cm + Humedad_Media + Presion_Media, data = df)
 
-# Selección de variables
-vars_numericas <- names(df)[sapply(df, is.numeric)]
-vars_independientes <- setdiff(vars_numericas, "Radiacion_Global") # Excluir la dependiente
-
-# Fórmula del modelo (todas las variables numéricas)
-formula_multiple <- as.formula(paste("Radiacion_Global ~", paste(vars_independientes, collapse = " + ")))
-cat("Fórmula del modelo:\n")
-print(formula_multiple)
-
-# Ajustar el modelo
-modelo_multiple <- lm(formula_multiple, data = df)
-
-# Resumen del modelo
-cat("\n--- RESUMEN DEL MODELO ---\n")
-summary_modelo <- summary(modelo_multiple)
-print(summary_modelo)
-
-# Métricas clave
-cat("\n--- MÉTRICAS DE AJUSTE ---\n")
-cat("R² ajustado:", round(summary_modelo$adj.r.squared, 4), "\n")
-cat("Error estándar residual:", round(summary_modelo$sigma, 4), "\n")
-
-# Análisis de coeficientes
-cat("\n--- SIGNIFICANCIA DE PREDICTORES ---\n")
-coef_tabla <- summary_modelo$coefficients
-print(round(coef_tabla, 4))
-
-# Gráficos diagnósticos
-cat("\nPreparando gráficos diagnósticos...\n")
-par(mfrow = c(2, 2))
-plot(modelo_multiple, which = c(1, 2, 5))
-par(mfrow = c(1, 1))
-
-# Pruebas de supuestos
-cat("\n--- PRUEBAS DE SUPUESTOS ---\n")
-cat("Normalidad (Shapiro-Wilk): p =",
-    format.pval(shapiro.test(residuals(modelo_multiple))$p.value), "\n")
-
-if(!require(lmtest)) install.packages("lmtest"); library(lmtest)
-cat("Homocedasticidad (Breusch-Pagan): p =",
-    format.pval(bptest(modelo_multiple)$p.value), "\n")
-
-# Recomendación final
-cat("\n--- RECOMENDACIONES ---\n")
-if(any(coef_tabla[-1, 4] < 0.05)) {
-  cat("- Predictores significativos detectados (p < 0.05)\n")
-} else {
-  cat("- Ningún predictor mostró significancia estadística\n")
-}
-
-if(summary_modelo$adj.r.squared < 0.5) {
-  cat("- El modelo explica poca variabilidad (R² ajustado < 50%)\n")
-} else {
-  cat("- Buen poder explicativo del modelo (R² ajustado ≥ 50%)\n")
-}
+summary(modelo_regmult)
 
 ```
+
+Podremos ver así que el R² será signficativamente mayor, explicando casi el 70% de la variabilidad de los datos, y el R² ajustado no será mucho menor al haber incorporado más variables al modelo. Cabe señalar que, en el caso de los coeficientes, el t-valor de la presión media es mayor que los demás, lo que podría cuestionarnos acerca de la significancia estadística que suma al modelo su incorporación.
 
 ## 3. Estadística no paramétrica
 
