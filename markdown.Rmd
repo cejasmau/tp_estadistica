@@ -281,10 +281,12 @@ qqline(rstandard(modelo_regresion), col = "black", lty = 2)
 
 ```
 
-Finalmente, la curva de QQ-Plot nos permite observar que, con la información y evidencia disponible, la condición de normalidad ajusta bien, tomando apenas una forma de S en las puntas.
+Finalmente, la curva de QQ-Plot nos permite observar que, con la información y evidencia disponible, la condición de normalidad ajusta bien, tomando apenas una forma de S en las puntas. A la misma conclusión podemos llegar mediante el test de Shapiro-Wilk, en la que el p-valor es mayor a 0.05, por lo que no se puede rechazar la hipótesis de normalidad:
 
 ```{r}
-summary(modelo_regresion)
+
+shapiro.test(modelo_regresion$residuals)
+
 ```
 
 De esta manera, no habiendo evidencia suficiente para rechazar las condiciones para el ruido aditivo E ∼ N(0, σ²), podemos considerar ambas variables X e Y como aleatorias y definir su coeficiente de correlación. Tal como vimos en el resumen del modelo:
@@ -299,7 +301,7 @@ print(summary(modelo_regresion)$r.squared, digits = 4)
 
 Este coeficiente expresa cuánto de la variabilidad de los datos es explicada por el modelo de regresión lineal y su bajo valor nos hace dudar acerca de la representatividad del modelo que desarrollamos.
 
-Aún así, verificamos que el p-valor de la pendiente ß₁ y de la ordenada al origen ß₀ son muy pequeños, lo que puede significar que exista una relación lineal entre ambas variables o que con un polinomio de mayor orden se obtenga un mejor resultado. Entonces, bajo la condición de normalidad, podremos realizar un test de hipótesis sobre la pendiente:
+Aún así, verificamos que el p-valor de la pendiente ß₁ y de la ordenada al origen ß₀ son muy pequeños, lo que puede significar que exista una relación lineal entre ambas variables o que con un polinomio de mayor orden se obtenga un mejor resultado. Entonces, bajo la condición de distribución normal de los residuos, podremos realizar un test de hipótesis sobre la pendiente:
 
 -   *H₀: ß₁ = 0*
 
@@ -335,59 +337,74 @@ Podremos ver así que el R² será signficativamente mayor, explicando casi el 7
 
 ## 3. Estadística no paramétrica
 
+En último lugar, vamos a repetir el test de hipótesis sobre la pendiente, pero en este caso utilizaremos un test no paramétrico para cuantificar la bondad de ajuste entre el conjunto de datos y el modelo. Este tipo de tests no paramétricos no suponen conocimiento alguno acerca de las distribuciones de las poblaciones, excepto que
+´estas son continuas.
+
+Para ello, en primer lugar, utilizaremos el Test de Kolmogorov–Smirnov, que busca comparar la función de distribución acumulada empírica con la teórica. De esta manera, vamos  a comparar la distribución de tus residuos con una distribución normal.
+
+
 ```{r}
 
-# Test Paramétrico Original (Regresión Lineal)
-cat("\n=== MÉTODO PARAMÉTRICO (REGRESIÓN LINEAL) ===\n")
-summary_param <- summary(modelo_regresion)
-coef_param <- summary_param$coefficients["Radiacion_Global", ]
-p_param <- coef_param["Pr(>|t|)"]
-
-cat("Coeficiente:", round(coef_param["Estimate"], 4),
-    "\nValor-p:", format.pval(p_param, digits = 4), "\n")
-
-# Test No Paramétrico (Correlación de Spearman)
-cat("\n=== MÉTODO NO PARAMÉTRICO (SPEARMAN) ===\n")
-cor_test <- cor.test(~ Radiacion_Global + Temperatura_Abrigo_150cm,
-                     data = df,
-                     method = "spearman",
-                     exact = FALSE)  # Para n > 50
-
-cat("Coeficiente Rho:", round(cor_test$estimate, 4),
-    "\nValor-p:", format.pval(cor_test$p.value, digits = 4), "\n")
-
-# Gráfico Comparativo
-ggplot(df, aes(x = Temperatura_Abrigo_150cm, y = Radiacion_Global)) +
-  geom_point(alpha = 0.6) +
-  geom_smooth(method = "lm", color = "red", se = FALSE, linetype = "dashed") +
-  geom_smooth(method = "loess", color = "blue", se = FALSE) +
-  labs(title = "Comparación de Modelos",
-       subtitle = "Rojo: Lineal (paramétrico) | Azul: LOESS (no paramétrico)",
-       x = "Temperatura Abrigo (150cm)",
-       y = "Radiación Global") +
-  theme_minimal()
-
-# Conclusión Comparativa
-cat("\n=== CONCLUSIÓN COMPARATIVA ===\n")
-if(p_param < 0.05 & cor_test$p.value < 0.05) {
-  cat("Ambos métodos coinciden en que existe relación significativa (p < 0.05).\n")
-  cat("El modelo paramétrico estima una pendiente de", round(coef_param["Estimate"], 4),
-      "mientras que Spearman muestra una correlación de", round(cor_test$estimate, 4), "\n")
-} else if(p_param >= 0.05 & cor_test$p.value >= 0.05) {
-  cat("Ambos métodos coinciden en NO encontrar relación significativa (p > 0.05).\n")
-} else {
-  cat("Los métodos discrepan:\n")
-  if(p_param < 0.05) {
-    cat("- El método paramétrico encuentra relación significativa (p =", format.pval(p_param), ")\n")
-  } else {
-    cat("- El método paramétrico NO encuentra relación significativa (p =", format.pval(p_param), ")\n")
-  }
-  if(cor_test$p.value < 0.05) {
-    cat("- El método no paramétrico encuentra relación significativa (p =", format.pval(cor_test$p.value), ")\n")
-  } else {
-    cat("- El método no paramétrico NO encuentra relación significativa (p =", format.pval(cor_test$p.value), ")\n")
-  }
-  cat("\nPosible causa: Supuestos del modelo paramétrico no se cumplen (ver residuos).\n")
-}
+ks.test(modelo_regresion$residuals, 
+        "pnorm", 
+        mean = mean(modelo_regresion$residuals), 
+        sd = sd(modelo_regresion$residuals))
 
 ```
+
+Al ser significativamente mayor el p-valor (0.88) al nivel de significatividad α (0.05), no tenemos evidencia suficiente para rechazar la hipótesis de la distribución normal de los residuos.
+
+En el test de tipo K-S, el tamaño de la muestra será relevante y, además, el centro de la distribución pesará más que las colas. Por este motivo, procederemos a usar otro tipo de tests superadores.
+
+
+```{r}
+
+nortest::sf.test(modelo_regresion$residuals)
+
+```
+A partir del test Shapiro-Francia, podremos comprobar que el p-valor es mayor al nivel de significatividad α, llegando a la misma conclusión que el test K-S.
+
+Luego, mediante el test de signo de los residuos, comprobaremos que no hay evidencia suficiente para rechazar la hipótesis que la mediana de los residuos sea igual a cero, que es lo esperado en un buen modelo de regresión. 
+
+```{r}
+
+BSDA:: SIGN.test(modelo_regresion$residuals, 
+                 md = 0, 
+                 alternative = "two.sided", 
+                 conf.level = 0.95)
+
+```
+
+Posteriormente, testearemos la misma hipótesis pero mediante el Test de Rangos Signados de Wilcoxon, un test más potente que el de signo que toma en cuenta la magnitud entre las diferencias entre las observaciones y la mediana. Tal como puede apreciarse, llegamos a la misma conclusión.
+
+
+```{r}
+
+wilcox.test(modelo_regresion$residuals, 
+            mu = 0, 
+            conf.level = 0.95, 
+            exact = FALSE, 
+            alternative = "two.sided")
+
+
+```
+
+En último lugar, como complemento al coeficiente de correlación de Pearson calculado anteriormente, testearemos tanto la relación entre las variables como la correlación entre los residuos y valores ajustados mediante el coeficiente de Spearman. 
+
+```{r}
+
+cor.test(df$Temperatura_Abrigo_150cm,
+                     df$Radiacion_Global,
+                     method = "spearman",
+                     exact = FALSE)
+
+cor.test(residuals(modelo_regresion), 
+         fitted(modelo_regresion), 
+         method = "spearman")
+
+```
+Por ello, no hay evidencia estadística suficiente para negar que exista una relación positiva entre las variables (a mayor radiación, mayor temperatura), ni para demostrar que haya patrones sistemáticos de los residuos con respecto a los valores predichos.
+
+
+## Conclusión
+
