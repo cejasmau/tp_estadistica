@@ -1,0 +1,406 @@
+---
+title: "Trabajo Final de Análisis Estadístico"
+subtitle: "Maestría de Ciencia de Datos - UNAJ"
+author: 
+  - "Facundo Cuba"
+  - "Leticia Nanini"
+  - "Mauro Cejas Marcovecchio"
+  - "Yesica Travasso"
+date: "2025-07-06"
+output:
+  pdf_document:
+    toc: true
+    fig_width: 7
+    fig_height: 4.5
+    fig_caption: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE
+)
+library(tidyverse)
+library(lmtest)
+library(coin)
+library(gt)
+
+```
+
+## Descripción
+
+El objetivo del siguiente trabajo es el procesamiento de datos y análisis estadísticos del dataset provisto por el Sistema de Información y Gestión Agrometeorológica (SIGA), del [Instituto Nacional de Tecnología Agropecuaria (INTA)](https://siga.inta.gob.ar/). Esta base de datos contiene información agrometeorológica de la ciudad de Castelar, Provincia de Buenos Aires, Argentina.
+
+
+## 1. Estadística descriptiva
+
+En primer lugar, vamos a poder tener una primera aproximación a los datos a partir del paquete ReadR, ya que el delimitador utilizado para separar las columnas es ";" y "." como separador decimal.
+
+```{r}
+
+# Cargamos los datos del grupo
+
+archivo <- "datos/01_Buenos_Aires_Castelar.csv"
+
+df <- read_delim(archivo, 
+                 delim = ";", 
+                 locale = locale(decimal_mark = "."))
+
+
+```
+
+Así, podremos ver que tendremos 472 observaciones con 5 variables:
+
+-   **Fecha**(en formato fecha): Día de medición.
+
+-   **Temperatura_Abrigo_150cm** (en formato número): La temperatura de abrigo es aquella medida en el abrigo meteorológico, que protege los instrumentos de medición de la radiación directa del sol, de la radiación terrestre nocturna, precipitación y condensación, entre otros. Su piso de abrigo es la altura a la que es medida la temperatura. En este caso, es de 150 cm por sobre el nivel del suelo.
+
+-   **Humedad Media** (en formato número): La humedad relativa es la relación entre la presión parcial del vapor de agua y la presión de vapor de equilibrio del agua a una temperatura dada.
+
+-   **Presión Media** (en formato número): La presión atmosférica es la fuerza por unidad de superficie que ejerce el aire que forma la atmósfera sobre la superficie terrestre.
+
+-   **Radiación Global** (en formato número): La radiación global es la radiación solar que recibe la superficie terrestre
+
+```{r}
+
+head(df)
+
+```
+
+También, podremos realizar una descripción numérica de los datos a partir de sus principales medidas de estadística descriptiva:
+
+```{r}
+
+estadisticas <- df |>
+  select(-Fecha) |>
+  summarise(across(everything(), 
+                  list(Minimo = min,
+                       Q1 = ~quantile(., 0.25),
+                       Mediana = median,
+                       Media = mean, 
+                       Q3 = ~quantile(., 0.75),
+                       Maximo = max,
+                       Desvio = sd,
+                       IQR = IQR),
+                  .names = "{.col}-{.fn}")) |>
+  pivot_longer(everything(), 
+               names_to = c("Variable", "Estadistica"), 
+               names_sep = "-") |>
+  pivot_wider(names_from = "Variable", values_from = "value")
+
+estadisticas |>
+  gt(rowname_col = "Estadistica",
+     groupname_col = "")|>
+  
+  tab_stubhead(label = "Medidas") |>
+  fmt_number(decimals = 2) |>
+  
+  cols_label(
+    "Temperatura_Abrigo_150cm" = "Temperatura",
+    "Humedad_Media" = "Humedad",
+    "Presion_Media" = "Presion",
+    "Radiacion_Global" = "Radiación"
+  ) |>
+  
+  tab_style(
+    style = cell_text(color = "black", 
+                        weight = "bold"),
+   locations = list(
+        cells_stub(),
+        cells_stubhead(),
+        cells_column_labels(everything())))
+
+
+```
+
+Tales medidas podrán ser visualizadas de mejor manera a partir de gráficos de líneas tradicionales, suavizados, histogramas y box-plots.
+
+```{r}
+
+df_long <- df |>
+  pivot_longer(cols = -Fecha, names_to = "Variable", values_to = "Valor")
+
+ggplot(df_long, aes(x = Fecha, y = Valor, color = Variable)) +
+  geom_line(show.legend = FALSE) +
+  facet_wrap(~Variable, 
+             scales = "free_y",
+             labeller = labeller(
+               Variable = c(
+                 "Humedad_Media" = "Humedad media",
+                 "Presion_Media" = "Presion media",
+                 "Radiacion_Global" = "Radiación global",
+                 "Temperatura_Abrigo_150cm" = "Temperatura de abrigo"))) +
+  theme_minimal()
+
+```
+
+```{r}
+
+ggplot(df_long, aes(x = Valor, fill = Variable)) +
+  geom_histogram(bins = 10, show.legend = FALSE) +
+  facet_wrap(~Variable, 
+             scales = "free_x",
+             labeller = labeller(
+               Variable = c(
+                 "Humedad_Media" = "Humedad media",
+                 "Presion_Media" = "Presion media",
+                 "Radiacion_Global" = "Radiación global",
+                 "Temperatura_Abrigo_150cm" = "Temperatura de abrigo"))) +
+  theme_minimal() +
+  labs(y = "Cantidad")
+  
+```
+
+```{r}
+
+ggplot(df_long, aes(y = Valor, fill = Variable)) +
+  geom_boxplot(show.legend = FALSE) +
+  facet_wrap(~Variable, 
+             scales = "free_y", 
+             nrow = 1,
+             labeller = labeller(
+               Variable = c(
+                 "Humedad_Media" = "Humedad media",
+                 "Presion_Media" = "Presion media",
+                 "Radiacion_Global" = "Radiación global",
+                 "Temperatura_Abrigo_150cm" = "Temperatura"))) +
+  theme_minimal() +
+  labs(y = "Valor")
+
+```
+
+## 2. Test de Hipótesis - Regresión Lineal
+
+Con el fin de tener una primera imagen acerca de las relaciones entre pares de las variables vamos a realizar una matriz de dispersión.
+
+```{r}
+
+df |>
+  select(-Fecha) |>
+  pairs(lower.panel = NULL,
+        pch = 1,
+        col = 'dodgerblue2',
+        main = "Matriz de dispersión",
+        las = 1,
+        labels = c("Temperatura", "Humedad", "Presión", "Radiación"),
+        gap = 0.5,
+        rowlattop = FALSE,
+        cex = 0.6,
+        cex.labels = 1.2,
+        cex.axis = 0.8,
+        font.labels = 1)
+
+```
+
+Al ver el diagrama de dispersión entre los valores de temperatura de abrigo y la radiación global, podríamos inferir una correlación positiva entre ambas. Por tal motivo, vamos a realizar un modelo de regresión lineal simple para comprobarlo, en el que la Temperatura de Abrigo dependa del nivel de Radiación Global.
+
+```{r}
+
+modelo_regresion <- lm(Temperatura_Abrigo_150cm ~ Radiacion_Global, data = df)
+
+summary(modelo_regresion)
+
+```
+
+A partir del resumen, podremos ver que los coeficientes del modelo serán una ordenada al origen de 11.81 y una pendiente de 0.41. Asimismo, graficaremos la regresión junto al cálculo de sus intervalos de confianza con un nivel del 95% (siendo notable la cantidad de observaciones que se encuentren por fuera de sus valores):
+
+```{r}
+
+print("Intervalos de confianza para los coeficientes:")
+
+confint(modelo_regresion, level = .95)
+
+```
+
+```{r}
+
+ggplot(df, aes(x = Radiacion_Global, y = Temperatura_Abrigo_150cm)) +
+  geom_point(alpha = 0.5,
+             color = "dodgerblue2") +
+  geom_smooth(method = "lm", 
+              se = TRUE) + 
+  labs(x = "radiación global",
+       y = "Temperatura del Abrigo") +
+  theme_minimal()
+
+```
+
+Antes de empezar con el modelo, vamos a testear los supuestos de independencia y distribución de los que partimos para obtener sus correspondientes valores:
+
+```{r}
+
+# Residuos estandarizados vs Valores ajustados
+
+plot(fitted(modelo_regresion),
+     rstandard(modelo_regresion),
+     col = "dodgerblue2",
+     xlab = "Valores ajustados",
+     ylab = "Residuos estandarizados")
+abline(h=2, lty=2, lwd=1, col="black")
+abline(h=-2, lty=2, lwd=1, col="black")
+abline(h=0, col="black")
+
+```
+
+En este gráfico, vamos a observar la relación entre los valores ajustados y el residuo estandarizado. Podemos ver, así, que existen algunos valores atípicos que se ubican por fuera del rango (-2,2).
+
+```{r}
+
+# Residuos vs Valores ajustados
+
+plot(fitted(modelo_regresion),
+     resid(modelo_regresion),
+     col = "dodgerblue2",
+     xlab = "Valores ajustados",
+     ylab = "Residuos")
+abline(h = 0, lty = 2, col = "black") 
+lines(lowess(fitted(modelo_regresion), 
+             resid(modelo_regresion)), 
+      col = "red")  
+
+```
+
+En relación al comportamiento de la varianza $\sigma^2$, veremos que la curva roja (útil para verificar la media cero) es relativamente plana y cercana a cero.
+
+```{r}
+
+# Gráfico Q-Q de normalidad
+
+qqnorm(
+  rstandard(modelo_regresion),
+  col = "dodgerblue2",
+  main = "",
+  xlab = "Cuantiles teóricos (Distrib. Normal)",  
+  ylab = "Residuos estandarizados"       
+)
+qqline(rstandard(modelo_regresion), col = "black", lty = 2)  
+
+```
+
+Finalmente, la curva de QQ-Plot nos permite observar que, con la información y evidencia disponible, la condición de normalidad ajusta bien, tomando apenas una forma de S en las puntas. A la misma conclusión podemos llegar mediante el test de Shapiro-Wilk, en la que el p-valor es mayor a 0.05, por lo que no se puede rechazar la hipótesis de normalidad:
+
+```{r}
+
+shapiro.test(modelo_regresion$residuals)
+
+```
+
+De esta manera, no habiendo evidencia suficiente para rechazar las condiciones para el ruido aditivo E $\sim$ N(0, $\sigma^2$), podemos considerar ambas variables X e Y como aleatorias y definir su coeficiente de correlación. Tal como vimos en el resumen del modelo:
+
+```{r}
+
+# Coeficiente de determinación (R-cuadrado)
+print("Coeficiente de correlación (R²):")
+print(summary(modelo_regresion)$r.squared, digits = 4)
+
+```
+
+Este coeficiente expresa cuánto de la variabilidad de los datos es explicada por el modelo de regresión lineal y su bajo valor nos hace dudar acerca de la representatividad del modelo que desarrollamos.
+
+Aún así, verificamos que el p-valor de la pendiente ß1 y de la ordenada al origen ß0 son muy pequeños, lo que puede significar que exista una relación lineal entre ambas variables o que con un polinomio de mayor orden se obtenga un mejor resultado. Entonces, bajo la condición de distribución normal de los residuos, podremos realizar un test de hipótesis sobre la pendiente:
+
+-   *H0: ß1 = 0*
+
+-   *H1: ß1 $/neq/$ 0*
+
+```{r}
+
+resumen <- summary(modelo_regresion)
+coef_info <- resumen$coefficients["Radiacion_Global", ]
+
+cat("Estadísticos:\n",
+    "Coeficiente estimado:", round(coef_info["Estimate"], 2), "\n",
+    "Error estándar:", round(coef_info["Std. Error"], 2), "\n",
+    "Estadístico t:", round(coef_info["t value"], 2), "\n",
+    "Grados libertad:", nrow(modelo_regresion$model) - 2, "\n",
+    "p-valor:", format.pval(coef_info["Pr(>|t|)"]), "\n\n")
+
+```
+
+Como el p-valor es menor a un nivel de significatividad $\alpha$ del 5%, podemos comprobar que no existe evidencia suficiente para descartar la relación lineal entre las variables.
+
+Así, tal como fue planteado anteriormente, vamos a realizar una regresión lineal múltiple incorporando el resto de las variables con las que contamos. En este caso, a diferencia de la regresión previa, tomaremos la Radiación Global como variable dependiente.
+
+```{r}
+
+modelo_regmult <- lm(Radiacion_Global ~ Temperatura_Abrigo_150cm + Humedad_Media + Presion_Media, data = df)
+
+summary(modelo_regmult)
+
+```
+
+Podremos ver así que el R² será signficativamente mayor, explicando casi el 70% de la variabilidad de los datos, y el R² ajustado no será mucho menor al haber incorporado más variables al modelo. Cabe señalar que, en el caso de los coeficientes, el t-valor de la presión media es mayor que los demás, lo que podría cuestionarnos acerca de la significancia estadística que suma al modelo su incorporación.
+
+## 3. Estadística no paramétrica
+
+En último lugar, vamos a repetir el test de hipótesis sobre la pendiente, pero en este caso utilizaremos un test no paramétrico para cuantificar la bondad de ajuste entre el conjunto de datos y el modelo. Este tipo de tests no paramétricos no suponen conocimiento alguno acerca de las distribuciones de las poblaciones, excepto que
+´estas son continuas.
+
+Para ello, en primer lugar, utilizaremos el Test de Kolmogorov–Smirnov, que busca comparar la función de distribución acumulada empírica con la teórica. De esta manera, vamos  a comparar la distribución de tus residuos con una distribución normal.
+
+
+```{r}
+
+ks.test(modelo_regresion$residuals, 
+        "pnorm", 
+        mean = mean(modelo_regresion$residuals), 
+        sd = sd(modelo_regresion$residuals))
+
+```
+
+Al ser significativamente mayor el p-valor (0.88) al nivel de significatividad $\alpha$ (0.05), no tenemos evidencia suficiente para rechazar la hipótesis de la distribución normal de los residuos.
+
+En el test de tipo K-S, el tamaño de la muestra será relevante y, además, el centro de la distribución pesará más que las colas. Por este motivo, procederemos a usar otro tipo de tests superadores.
+
+
+```{r}
+
+nortest::sf.test(modelo_regresion$residuals)
+
+```
+A partir del test Shapiro-Francia, podremos comprobar que el p-valor es mayor al nivel de significatividad $\alpha$, llegando a la misma conclusión que el test K-S.
+
+Luego, mediante el test de signo de los residuos, comprobaremos que no hay evidencia suficiente para rechazar la hipótesis que la mediana de los residuos sea igual a cero, que es lo esperado en un buen modelo de regresión. 
+
+```{r}
+
+BSDA:: SIGN.test(modelo_regresion$residuals, 
+                 md = 0, 
+                 alternative = "two.sided", 
+                 conf.level = 0.95)
+
+```
+
+Posteriormente, testearemos la misma hipótesis pero mediante el Test de Rangos Signados de Wilcoxon, un test más potente que el de signo que toma en cuenta la magnitud entre las diferencias entre las observaciones y la mediana. Tal como puede apreciarse, llegamos a la misma conclusión.
+
+
+```{r}
+
+wilcox.test(modelo_regresion$residuals, 
+            mu = 0, 
+            conf.level = 0.95, 
+            exact = FALSE, 
+            alternative = "two.sided")
+
+
+```
+
+En último lugar, como complemento al coeficiente de correlación de Pearson calculado anteriormente, testearemos tanto la relación entre las variables como la correlación entre los residuos y valores ajustados mediante el coeficiente de Spearman. 
+
+```{r}
+
+cor.test(df$Temperatura_Abrigo_150cm,
+                     df$Radiacion_Global,
+                     method = "spearman",
+                     exact = FALSE)
+
+cor.test(residuals(modelo_regresion), 
+         fitted(modelo_regresion), 
+         method = "spearman")
+
+```
+Por ello, no hay evidencia estadística suficiente para negar que exista una relación positiva entre las variables (a mayor radiación, mayor temperatura), ni para demostrar que haya patrones sistemáticos de los residuos con respecto a los valores predichos.
+
+
+## Conclusión
