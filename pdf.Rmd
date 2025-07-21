@@ -6,11 +6,11 @@ author:
   - "Leticia Nanini"
   - "Mauro Cejas Marcovecchio"
   - "Yesica Travasso"
-date: "2025-07-06"
+date: "2025-07-21"
 output:
   pdf_document:
     toc: true
-    fig_width: 7
+    fig_width: 6
     fig_height: 4.5
     fig_caption: true
 ---
@@ -22,20 +22,25 @@ knitr::opts_chunk$set(
 	warning = FALSE
 )
 library(tidyverse)
+# install.packages("lmtest")
 library(lmtest)
+# install.packages("coin")
 library(coin)
+# install.packages("gt")
 library(gt)
+# install.packages("nortest")
+# install.packages("BSDA")
 
 ```
 
-## Descripción
+## Introducción
 
 El objetivo del siguiente trabajo es el procesamiento de datos y análisis estadísticos del dataset provisto por el Sistema de Información y Gestión Agrometeorológica (SIGA), del [Instituto Nacional de Tecnología Agropecuaria (INTA)](https://siga.inta.gob.ar/). Esta base de datos contiene información agrometeorológica de la ciudad de Castelar, Provincia de Buenos Aires, Argentina.
 
 
 ## 1. Estadística descriptiva
 
-En primer lugar, vamos a poder tener una primera aproximación a los datos a partir del paquete ReadR, ya que el delimitador utilizado para separar las columnas es ";" y "." como separador decimal.
+En primer lugar, vamos a tener una primera aproximación a los datos a partir de su incorporación al trabajo como dataframe y el análisis de las variables que contiene. Así, podremos ver que tendremos 472 observaciones con 5 variables:
 
 ```{r}
 
@@ -50,8 +55,6 @@ df <- read_delim(archivo,
 
 ```
 
-Así, podremos ver que tendremos 472 observaciones con 5 variables:
-
 -   **Fecha**(en formato fecha): Día de medición.
 
 -   **Temperatura_Abrigo_150cm** (en formato número): La temperatura de abrigo es aquella medida en el abrigo meteorológico, que protege los instrumentos de medición de la radiación directa del sol, de la radiación terrestre nocturna, precipitación y condensación, entre otros. Su piso de abrigo es la altura a la que es medida la temperatura. En este caso, es de 150 cm por sobre el nivel del suelo.
@@ -60,15 +63,8 @@ Así, podremos ver que tendremos 472 observaciones con 5 variables:
 
 -   **Presión Media** (en formato número): La presión atmosférica es la fuerza por unidad de superficie que ejerce el aire que forma la atmósfera sobre la superficie terrestre.
 
--   **Radiación Global** (en formato número): La radiación global es la radiación solar que recibe la superficie terrestre
+-   **Radiación Global** (en formato número): La radiación global es la radiación solar que recibe la superficie terrestre.
 
-```{r}
-
-head(df)
-
-```
-
-También, podremos realizar una descripción numérica de los datos a partir de sus principales medidas de estadística descriptiva:
 
 ```{r}
 
@@ -114,7 +110,7 @@ estadisticas |>
 
 ```
 
-Tales medidas podrán ser visualizadas de mejor manera a partir de gráficos de líneas tradicionales, suavizados, histogramas y box-plots.
+En la tabla superior, podremos observar una descripción numérica de los datos a partir de sus principales medidas de estadística descriptiva. Asimismo, tales medidas podrán ser visualizadas de mejor manera a partir de distintos tipos de gráficos:
 
 ```{r}
 
@@ -131,7 +127,13 @@ ggplot(df_long, aes(x = Fecha, y = Valor, color = Variable)) +
                  "Presion_Media" = "Presion media",
                  "Radiacion_Global" = "Radiación global",
                  "Temperatura_Abrigo_150cm" = "Temperatura de abrigo"))) +
-  theme_minimal()
+  scale_x_datetime(date_labels = "%m-%y") +
+  labs(title = "Gráficos de líneas") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 12, face = "bold", hjust = 0.5),
+    axis.text.x = element_text(size = 7)
+  )
 
 ```
 
@@ -148,7 +150,15 @@ ggplot(df_long, aes(x = Valor, fill = Variable)) +
                  "Radiacion_Global" = "Radiación global",
                  "Temperatura_Abrigo_150cm" = "Temperatura de abrigo"))) +
   theme_minimal() +
-  labs(y = "Cantidad")
+  labs(title = "Histogramas (distribución de los datos)",
+        y = "Frecuencia absoluta") +
+  theme(
+    plot.title = element_text(
+      size = 12,           
+      face = "bold",      
+      hjust = 0.5          
+    )
+  )
   
 ```
 
@@ -166,7 +176,16 @@ ggplot(df_long, aes(y = Valor, fill = Variable)) +
                  "Radiacion_Global" = "Radiación global",
                  "Temperatura_Abrigo_150cm" = "Temperatura"))) +
   theme_minimal() +
-  labs(y = "Valor")
+  labs(title = "Diagrama de cajas (box-plots)",
+      y = "Valor") +
+  theme(
+    plot.title = element_text(
+      size = 12,           
+      face = "bold",      
+      hjust = 0.5          
+    ),
+    axis.text.x = element_blank()
+  )
 
 ```
 
